@@ -7,5 +7,5 @@ esbuild.build({
   target: 'node18',
   outfile: 'dist/server.cjs',
   format: 'cjs',
-  external: ['better-sqlite3', 'express', 'bcrypt', 'jsonwebtoken'],
+  external: ['better-sqlite3', 'express', 'bcrypt', 'jsonwebtoken', 'vite'],
 }).catch(() => process.exit(1));

@@ -12,6 +12,7 @@ import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import CraftIllustration from '../components/illustrations/CraftIllustration';
 import CraftReviews from '../components/reviews/CraftReviews';
+import { useCraftImages } from '../contexts/CraftImagesContext';
 
 export default function CraftSingle() {
   const { id } = useParams<{ id: string }>();
@@ -19,6 +20,7 @@ export default function CraftSingle() {
   const course = id ? coursesData[id as keyof typeof coursesData] : null;
   const { t, i18n } = useTranslation();
   const isRTL = i18n.language === 'ar';
+  const { images } = useCraftImages();
 
   if (!craft) {
     return (
@@ -44,7 +46,11 @@ export default function CraftSingle() {
           transition={{ duration: 1.5 }}
           className="w-full h-full mix-blend-overlay"
         >
-           <CraftIllustration craftId={craft.id} className="w-full h-full object-cover" />
+           {images[craft.id] ? (
+             <img src={images[craft.id]} alt={craft.nameAR} className="w-full h-full object-cover" crossOrigin="anonymous" />
+           ) : (
+             <CraftIllustration craftId={craft.id} className="w-full h-full object-cover" />
+           )}
         </motion.div>
         <div className="absolute inset-0 bg-gradient-to-t from-[#1E1C1A] via-[#1E1C1A]/40 to-transparent" />
         

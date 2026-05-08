@@ -1,8 +1,10 @@
 import express from 'express';
-import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import fs from 'fs';
+import multer from 'multer';
+import sharp from 'sharp';
 import db from './src/server/db'; 
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-123';
@@ -146,8 +148,67 @@ async function startServer() {
     }
   });
 
+  // Handle Image Uploads with Watermark
+  const uploadDir = path.join(process.cwd(), 'uploads', 'crafts');
+  fs.mkdirSync(uploadDir, { recursive: true });
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+  const storage = multer.memoryStorage();
+  const upload = multer({ storage });
+
+  app.post('/api/admin/craft-image/:craftId', upload.single('image'), async (req, res) => {
+    try {
+      const { craftId } = req.params;
+      if (!req.file) {
+        res.status(400).json({ error: 'No image uploaded' });
+        return;
+      }
+      const filename = `${craftId}-${Date.now()}.webp`;
+      const outputPath = path.join(uploadDir, filename);
+
+      const svgWatermark = Buffer.from(`
+        <svg width="400" height="100">
+          <text x="10" y="80" font-family="sans-serif" font-size="28" fill="rgba(255, 255, 255, 0.5)" font-weight="bold">
+            CFPA Jdiouia
+          </text>
+        </svg>
+      `);
+
+      await sharp(req.file.buffer)
+        .resize({ width: 1200, withoutEnlargement: true })
+        .composite([{ input: svgWatermark, gravity: 'southeast', blend: 'overlay' }])
+        .webp({ quality: 80 })
+        .toFile(outputPath);
+
+      const realImageUrl = \`/uploads/crafts/\${filename}\`;
+
+      const stmt = db.prepare(\`
+        INSERT INTO craft_images (craft_id, real_image_url) 
+        VALUES (?, ?) 
+        ON CONFLICT(craft_id) DO UPDATE SET real_image_url = excluded.real_image_url
+      \`);
+      stmt.run(craftId, realImageUrl);
+
+      res.json({ success: true, realImageUrl });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Internal server error while processing image' });
+    }
+  });
+
+  app.get('/api/craft-images', (req, res) => {
+    try {
+      const stmt = db.prepare('SELECT * FROM craft_images');
+      const rows = stmt.all();
+      res.json({ images: rows });
+    } catch (err) {
+      res.status(500).json({ error: 'Internal server error fetching images' });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',

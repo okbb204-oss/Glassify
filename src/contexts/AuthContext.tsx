@@ -67,11 +67,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const loginOrRegister = async (url: string, body: any) => {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
+    let res;
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+    } catch (err: any) {
+      throw new Error('Network error: Could not connect to the server.');
+    }
+
+    const contentType = res.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+        throw new Error('Server returned an invalid response. This API endpoint might be missing or broken.');
+    }
+
     const data = await res.json();
     if (!res.ok) {
       throw new Error(data.error || 'Request failed');

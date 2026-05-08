@@ -20,6 +20,7 @@ export interface Craft {
   averageIncome: string;
   averageIncomeEN?: string;
   image: string;
+  realImageUrl?: string;
 }
 
 export const crafts: Craft[] = [

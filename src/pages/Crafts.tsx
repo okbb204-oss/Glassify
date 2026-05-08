@@ -5,12 +5,14 @@ import { crafts } from '../data/crafts';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import CraftIllustration from '../components/illustrations/CraftIllustration';
+import { useCraftImages } from '../contexts/CraftImagesContext';
 
 export default function CraftsDir() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const { t, i18n } = useTranslation();
   const isRTL = i18n.language === 'ar';
+  const { images } = useCraftImages();
 
   const categories = useMemo(() => {
     return Array.from(new Set(crafts.map(c => (!isRTL && c.categoryEN) ? c.categoryEN : c.category)));
@@ -175,7 +177,11 @@ export default function CraftsDir() {
               >
                 {/* Image Section */}
                 <div className="h-56 relative overflow-hidden">
-                  <CraftIllustration craftId={craft.id} className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110 group-hover:brightness-105" />
+                  {images[craft.id] ? (
+                    <img src={images[craft.id]} alt={craft.nameAR} className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110 group-hover:brightness-105" crossOrigin="anonymous" />
+                  ) : (
+                    <CraftIllustration craftId={craft.id} className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110 group-hover:brightness-105" />
+                  )}
                   
                   {/* Category Badge */}
                   <div className={`absolute top-4 ${isRTL ? 'right-4' : 'left-4'}`}>

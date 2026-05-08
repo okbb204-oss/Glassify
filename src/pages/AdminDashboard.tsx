@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { generateLearningPath, generateQuizFromSummary, GeminiError } from '../services/geminiService';
 
+import ImageUploaderAdmin from './ImageUploaderAdmin';
+
 interface GeneratedItem {
   id: string;
   type: 'path' | 'quiz';
@@ -14,7 +16,7 @@ interface GeneratedItem {
 }
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'path' | 'quiz'>('path');
+  const [activeTab, setActiveTab] = useState<'path' | 'quiz' | 'image'>('path');
 
   // Path Generator State
   const [craftName, setCraftName] = useState('');
@@ -145,9 +147,19 @@ export default function AdminDashboard() {
              <HelpCircle className="w-4 h-4" />
              {isRTL ? 'توليد اختبار (Quiz)' : 'Generate Quiz'}
            </button>
+           <button 
+             onClick={() => { setActiveTab('image'); setGeneratedPrompt(null); setError(null); }}
+             className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 ${activeTab === 'image' ? 'bg-[var(--color-primary)] text-white' : 'text-[var(--color-secondary)] hover:bg-[var(--color-input-bg)]'}`}
+           >
+             <Sparkles className="w-4 h-4" />
+             {isRTL ? 'صور الحرف' : 'Craft Images'}
+           </button>
          </div>
 
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+         {activeTab === 'image' ? (
+           <ImageUploaderAdmin />
+         ) : (
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             
             {/* Form */}
             <div className="bg-[var(--color-card)] p-8 rounded-3xl shadow-sm border border-[var(--color-border)]">
@@ -285,6 +297,8 @@ export default function AdminDashboard() {
                  </button>
                )}
             </div>
+          </div>
+         )}
            {/* Recently Generated Carousel */}
           {history.length > 0 && (
             <div className="mt-16">

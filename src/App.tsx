@@ -20,6 +20,7 @@ import TrainingModes from './pages/TrainingModes';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ProgressProvider } from './contexts/ProgressContext';
 import { AuthProvider } from './contexts/AuthContext';
+import { CraftImagesProvider } from './contexts/CraftImagesContext';
 import HirfaChatbot from './components/chat/HirfaChatbot';
 
 function AppContent() {
@@ -64,9 +65,11 @@ export default function App() {
     <ThemeProvider>
       <AuthProvider>
         <ProgressProvider>
-          <BrowserRouter>
-            <AppContent />
-          </BrowserRouter>
+          <CraftImagesProvider>
+            <BrowserRouter>
+              <AppContent />
+            </BrowserRouter>
+          </CraftImagesProvider>
         </ProgressProvider>
       </AuthProvider>
     </ThemeProvider>
