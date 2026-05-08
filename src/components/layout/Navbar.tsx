@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Hammer, User, Menu, X, Compass, Search, BookOpen, Sun, Moon, LogIn, Building2 } from 'lucide-react';
+import { Hammer, User, Menu, X, Compass, Search, BookOpen, Sun, Moon, LogIn, Building2, Shield } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useThemeSettings } from '../../contexts/ThemeContext';
 import { BrandLogo } from './BrandLogo';
 import { useAuth } from '../../contexts/AuthContext';
 import AuthModal from '../auth/AuthModal';
+import GuestBackupModal from '../auth/GuestBackupModal';
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isGuestBackupOpen, setIsGuestBackupOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -77,6 +79,17 @@ export default function Navbar() {
                >
                  {language === 'ar' ? 'EN' : 'AR'}
                </button>
+
+               {user?.is_guest && (
+                 <button 
+                   onClick={() => setIsGuestBackupOpen(true)}
+                   className="text-[var(--color-secondary)] hover:text-[#008080] transition-colors relative flex items-center justify-center group"
+                   title={language === 'ar' ? 'احفظ تقدمك' : 'Save your progress'}
+                 >
+                   <Shield className="w-6 h-6" />
+                   <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[var(--color-navbar-bg)]"></span>
+                 </button>
+               )}
 
                {user ? (
                  <Link 
@@ -170,6 +183,11 @@ export default function Navbar() {
       <AuthModal 
         isOpen={isAuthModalOpen} 
         onClose={() => setIsAuthModalOpen(false)} 
+      />
+      
+      <GuestBackupModal 
+         isOpen={isGuestBackupOpen}
+         onClose={() => setIsGuestBackupOpen(false)}
       />
     </>
   );

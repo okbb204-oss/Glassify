@@ -21,4 +21,12 @@ db.exec(`
   );
 `);
 
+try {
+  db.exec("ALTER TABLE users ADD COLUMN is_guest BOOLEAN DEFAULT 0;");
+  db.exec("ALTER TABLE users ADD COLUMN backup_code TEXT;");
+  db.exec("ALTER TABLE users ADD COLUMN phone_number TEXT;");
+} catch(e) {
+  // Ignore errors if columns already exist
+}
+
 export default db;

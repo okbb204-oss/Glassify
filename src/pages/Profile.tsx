@@ -61,7 +61,7 @@ type TabType = 'overview' | 'my-crafts' | 'achievements' | 'portfolio' | 'settin
 export default function Profile() {
   const { t, i18n } = useTranslation();
   const isRtl = i18n.language === 'ar';
-  const { user, profile: authProfile, loading, logout } = useAuth();
+  const { user, profile: authProfile, loading, logout, guestConvert: authGuestConvert } = useAuth();
   const { progress } = useProgress();
   const navigate = useNavigate();
   const { isDarkMode, toggleDarkMode } = useThemeSettings();
@@ -560,10 +560,6 @@ export default function Profile() {
                 <div className="w-32 h-32 rounded-[2.5rem] bg-[var(--color-accent)] flex items-center justify-center text-white text-4xl font-bold border-4 border-white dark:border-[#2A2724] shadow-2xl overflow-hidden transform rotate-3 hover:rotate-0 transition-transform duration-500">
                   {profile.name.charAt(0)}
                 </div>
-                <label className="absolute -bottom-2 -right-2 w-10 h-10 bg-[#C67B4B] text-white rounded-2xl flex items-center justify-center cursor-pointer hover:scale-110 transition-transform shadow-lg">
-                  <Settings className="w-5 h-5" />
-                  <input type="file" className="hidden" />
-                </label>
               </div>
               <div className="text-center md:text-start">
                  <h4 className="font-bold text-2xl dark:text-white mb-2">{profile.name}</h4>
@@ -571,34 +567,81 @@ export default function Profile() {
                     <Star className="w-4 h-4" />
                     @{profile.username}
                  </div>
+                 {profile.is_guest && (
+                   <span className="inline-block mt-2 text-xs font-bold bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full">
+                     {isRtl ? 'حساب زائر' : 'Guest Account'}
+                   </span>
+                 )}
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-               <div className="space-y-3">
-                 <label className="text-xs font-bold text-gray-500 uppercase tracking-[0.2em]">{isRtl ? 'الاسم بالكامل' : 'Full Name'}</label>
-                 <input type="text" defaultValue={profile.name} className="w-full px-6 py-4 rounded-2xl bg-[var(--color-input-bg)] border-2 border-[var(--color-border)] focus:border-[#C67B4B] outline-none transition-all dark:text-white font-medium" />
-               </div>
-               <div className="space-y-3">
-                 <label className="text-xs font-bold text-gray-500 uppercase tracking-[0.2em]">{isRtl ? 'اسم المستخدم' : 'Username'}</label>
-                 <div className="relative">
-                   <input type="text" defaultValue={profile.username} className="w-full px-6 py-4 rounded-2xl bg-[var(--color-input-bg)] border-2 border-[var(--color-border)] focus:border-[#C67B4B] outline-none transition-all dark:text-white font-medium" />
-                   <div className="mt-2 text-[10px] text-gray-400 italic">
-                     {isRtl ? '* يمكنك تغيير اسم المستخدم مرة كل 30 يوماً.' : '* You can change your username once every 30 days.'}
+            {profile.is_guest ? (
+              <div className="pt-2">
+                <h4 className="font-bold text-lg mb-4">{isRtl ? 'ترقية لحساب دائم' : 'Upgrade to Permanent Account'}</h4>
+                <p className="text-sm text-gray-500 mb-6 font-medium">
+                  {isRtl ? 'اختر اسم مستخدم وكلمة مرور لحفظ بياناتك بشكل دائم.' : 'Choose a username and password to keep your data permanently.'}
+                </p>
+                <form 
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.target as HTMLFormElement);
+                    const un = formData.get('username') as string;
+                    const pw = formData.get('password') as string;
+                    
+                    try {
+                      await authGuestConvert(un, pw);
+                      alert(isRtl ? 'تم تحديث الحساب بنجاح' : 'Account updated successfully');
+                    } catch (err: any) {
+                      alert(err.message || 'Error occurred');
+                    }
+                  }}
+                  className="grid grid-cols-1 md:grid-cols-2 gap-8"
+                  id="convert-form"
+                >
+                  <div className="space-y-3">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-[0.2em]">{isRtl ? 'اسم مستخدم جديد' : 'New Username'}</label>
+                    <input name="username" type="text" required className="w-full px-6 py-4 rounded-2xl bg-[var(--color-input-bg)] border-2 border-[var(--color-border)] focus:border-[#C67B4B] outline-none transition-all dark:text-white font-medium" />
+                  </div>
+                  <div className="space-y-3">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-[0.2em]">{isRtl ? 'كلمة المرور' : 'Password'}</label>
+                    <input name="password" type="password" required className="w-full px-6 py-4 rounded-2xl bg-[var(--color-input-bg)] border-2 border-[var(--color-border)] focus:border-[#C67B4B] outline-none transition-all dark:text-white font-medium" />
+                  </div>
+                </form>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                 <div className="space-y-3">
+                   <label className="text-xs font-bold text-gray-500 uppercase tracking-[0.2em]">{isRtl ? 'الاسم بالكامل' : 'Full Name'}</label>
+                   <input type="text" defaultValue={profile.name} className="w-full px-6 py-4 rounded-2xl bg-[var(--color-input-bg)] border-2 border-[var(--color-border)] focus:border-[#C67B4B] outline-none transition-all dark:text-white font-medium" />
+                 </div>
+                 <div className="space-y-3">
+                   <label className="text-xs font-bold text-gray-500 uppercase tracking-[0.2em]">{isRtl ? 'اسم المستخدم' : 'Username'}</label>
+                   <div className="relative">
+                     <input type="text" defaultValue={profile.username} className="w-full px-6 py-4 rounded-2xl bg-[var(--color-input-bg)] border-2 border-[var(--color-border)] focus:border-[#C67B4B] outline-none transition-all dark:text-white font-medium" />
+                     <div className="mt-2 text-[10px] text-gray-400 italic">
+                       {isRtl ? '* يمكنك تغيير اسم المستخدم مرة كل 30 يوماً.' : '* You can change your username once every 30 days.'}
+                     </div>
                    </div>
                  </div>
-               </div>
-               <div className="space-y-3 md:col-span-2">
-                 <label className="text-xs font-bold text-gray-500 uppercase tracking-[0.2em]">{isRtl ? 'البريد الإلكتروني (اختياري)' : 'Email (Optional)'}</label>
-                 <input type="email" defaultValue={profile.email} className="w-full px-6 py-4 rounded-2xl bg-[var(--color-input-bg)] border-2 border-[var(--color-border)] focus:border-[#C67B4B] outline-none transition-all dark:text-white font-medium" placeholder="your@email.com" />
-               </div>
-            </div>
+                 <div className="space-y-3 md:col-span-2">
+                   <label className="text-xs font-bold text-gray-500 uppercase tracking-[0.2em]">{isRtl ? 'البريد الإلكتروني (اختياري)' : 'Email (Optional)'}</label>
+                   <input type="email" defaultValue={profile.email} className="w-full px-6 py-4 rounded-2xl bg-[var(--color-input-bg)] border-2 border-[var(--color-border)] focus:border-[#C67B4B] outline-none transition-all dark:text-white font-medium" placeholder="your@email.com" />
+                 </div>
+              </div>
+            )}
 
             <div className="pt-6">
-              <button className="w-full md:w-fit px-12 py-4 bg-[#C67B4B] text-white font-bold rounded-2xl shadow-xl shadow-[#C67B4B]/20 hover:bg-[#A3592F] transition-all flex items-center justify-center gap-2">
-                <CheckCircle2 className="w-5 h-5" />
-                {isRtl ? 'حفظ التعديلات' : 'Save Changes'}
-              </button>
+              {profile.is_guest ? (
+                <button type="submit" form="convert-form" className="w-full md:w-fit px-12 py-4 bg-[#C67B4B] text-white font-bold rounded-2xl shadow-xl shadow-[#C67B4B]/20 hover:bg-[#A3592F] transition-all flex items-center justify-center gap-2">
+                  <CheckCircle2 className="w-5 h-5" />
+                  {isRtl ? 'ترقية الحساب' : 'Upgrade Account'}
+                </button>
+              ) : (
+                <button className="w-full md:w-fit px-12 py-4 bg-[#C67B4B] text-white font-bold rounded-2xl shadow-xl shadow-[#C67B4B]/20 hover:bg-[#A3592F] transition-all flex items-center justify-center gap-2">
+                  <CheckCircle2 className="w-5 h-5" />
+                  {isRtl ? 'حفظ التعديلات' : 'Save Changes'}
+                </button>
+              )}
             </div>
           </div>
         </section>

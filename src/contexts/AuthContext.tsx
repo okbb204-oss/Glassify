@@ -1,9 +1,12 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 
-interface UserProfile {
+export interface UserProfile {
   id: string;
   name: string;
   username: string;
+  is_guest?: boolean;
+  backup_code?: string;
+  phone_number?: string;
   email?: string;
   avatarUrl?: string;
   xp: number;
@@ -25,6 +28,12 @@ interface AuthContextType {
   sendVerificationEmail: () => Promise<void>;
   sendPasswordReset: (username: string) => Promise<void>;
   logout: () => Promise<void>;
+  
+  // Guest Methods
+  guestBackupCode: () => Promise<string>;
+  guestLinkPhone: (phone: string) => Promise<void>;
+  guestRestore: (code?: string, phone?: string) => Promise<void>;
+  guestConvert: (username: string, password: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -33,36 +42,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const initGuestUser = async () => {
+    try {
+      const res = await fetch('/api/auth/guest-init', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem('token', data.token);
+        setUser({
+          id: String(data.user.id),
+          name: data.user.username,
+          username: data.user.username,
+          is_guest: true,
+          xp: 0,
+          streak: 1,
+          createdAt: new Date(),
+          lastLogin: new Date()
+        });
+      }
+    } catch(e) {
+      console.error('Failed to init guest', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchMe = async (token: string) => {
+    try {
+      const res = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error('Invalid token');
+      const data = await res.json();
+      setUser({
+        id: String(data.user.id),
+        name: data.user.username,
+        username: data.user.username,
+        is_guest: !!data.user.is_guest,
+        backup_code: data.user.backup_code,
+        phone_number: data.user.phone_number,
+        xp: 0,
+        streak: 1,
+        createdAt: new Date(),
+        lastLogin: new Date()
+      });
+    } catch (e) {
+      localStorage.removeItem('token');
+      await initGuestUser();
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
-      fetch('/api/auth/me', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      .then(res => {
-        if (res.ok) return res.json();
-        throw new Error('Invalid token');
-      })
-      .then(data => {
-         const profileData: UserProfile = {
-           id: String(data.user.id),
-           name: data.user.username,
-           username: data.user.username,
-           xp: 0,
-           streak: 1,
-           createdAt: new Date(),
-           lastLogin: new Date()
-         };
-         setUser(profileData);
-      })
-      .catch(() => {
-         localStorage.removeItem('token');
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+      fetchMe(token);
     } else {
-      setLoading(false);
+      initGuestUser();
     }
   }, []);
 
@@ -80,24 +114,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const contentType = res.headers.get("content-type");
     if (!contentType || !contentType.includes("application/json")) {
-        throw new Error('Server returned an invalid response. This API endpoint might be missing or broken.');
+        throw new Error('Server returned an invalid response.');
     }
 
     const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Request failed');
-    }
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    
     localStorage.setItem('token', data.token);
-    const profileData: UserProfile = {
-      id: String(data.user.id),
-      name: data.user.username,
-      username: data.user.username,
-      xp: 0,
-      streak: 1,
-      createdAt: new Date(),
-      lastLogin: new Date()
-    };
-    setUser(profileData);
+    await fetchMe(data.token);
   };
 
   const signUpWithUsername = async (username: string, password: string, confirmPassword: string) => {
@@ -111,6 +135,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     localStorage.removeItem('token');
     setUser(null);
+    await initGuestUser();
+  };
+
+  const guestBackupCode = async () => {
+    const res = await fetch('/api/auth/guest-backup-code', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    });
+    if (!res.ok) throw new Error('Failed to generate code');
+    const data = await res.json();
+    setUser(u => u ? { ...u, backup_code: data.backupCode } : null);
+    return data.backupCode;
+  };
+
+  const guestLinkPhone = async (phone: string) => {
+    const res = await fetch('/api/auth/guest-link-phone', {
+      method: 'POST',
+      headers: { 
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json' 
+      },
+      body: JSON.stringify({ phone })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to link phone');
+    setUser(u => u ? { ...u, phone_number: phone } : null);
+  };
+
+  const guestRestore = async (code?: string, phone?: string) => {
+    const res = await fetch('/api/auth/guest-restore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, phone })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to restore account');
+    localStorage.setItem('token', data.token);
+    await fetchMe(data.token);
+  };
+
+  const guestConvert = async (username: string, password: string) => {
+    const res = await fetch('/api/auth/guest-convert', {
+      method: 'POST',
+      headers: { 
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json' 
+      },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to convert account');
+    localStorage.setItem('token', data.token);
+    await fetchMe(data.token);
   };
 
   // Stubs for compatibility
@@ -128,7 +205,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithUsername,
       sendVerificationEmail,
       sendPasswordReset,
-      logout 
+      logout,
+      guestBackupCode,
+      guestLinkPhone,
+      guestRestore,
+      guestConvert
     }}>
       {children}
     </AuthContext.Provider>

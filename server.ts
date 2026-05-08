@@ -142,10 +142,127 @@ async function startServer() {
       const token = authHeader.split(' ')[1];
       const decoded = jwt.verify(token, JWT_SECRET) as any;
       
-      res.json({ user: { id: decoded.userId, username: decoded.username } });
+      const stmt = db.prepare('SELECT id, username, is_guest, backup_code, phone_number FROM users WHERE id = ?');
+      const user = stmt.get(decoded.userId) as any;
+      
+      if (!user) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      res.json({ user });
     } catch (error) {
       res.status(401).json({ error: 'Invalid token' });
     }
+  });
+
+  app.post('/api/auth/guest-init', async (req, res) => {
+    try {
+      const { randomUUID, randomBytes } = await import('crypto');
+      const guestUuid = randomUUID();
+      const tempHash = await bcrypt.hash(randomBytes(16).toString('hex'), 10);
+      const stmtInsert = db.prepare('INSERT INTO users (username, password_hash, is_guest) VALUES (?, ?, 1)');
+      const username = `guest_${guestUuid}`;
+      const info = stmtInsert.run(username, tempHash);
+      const userId = info.lastInsertRowid;
+      
+      const token = jwt.sign({ userId, username }, JWT_SECRET, { expiresIn: '7d' });
+      res.json({ token, user: { id: userId, username, is_guest: 1 } });
+    } catch (error) {
+      console.error('Guest Init Error:', error);
+      res.status(500).json({ error: 'Internal server error resolving guest auth' });
+    }
+  });
+
+  app.post('/api/auth/guest-backup-code', async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ error: 'Missing token' });
+      const token = authHeader.split(' ')[1];
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      
+      const { randomBytes } = await import('crypto');
+      const backupCode = `HIRFA-${randomBytes(2).toString('hex').toUpperCase()}`;
+      const stmtUpdate = db.prepare('UPDATE users SET backup_code = ? WHERE id = ?');
+      stmtUpdate.run(backupCode, decoded.userId);
+
+      res.json({ backupCode });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Could not generate backup code' });
+    }
+  });
+
+  app.post('/api/auth/guest-link-phone', async (req, res) => {
+     try {
+       const authHeader = req.headers.authorization;
+       if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ error: 'Missing token' });
+       const token = authHeader.split(' ')[1];
+       const decoded = jwt.verify(token, JWT_SECRET) as any;
+       
+       const { phone } = req.body;
+       if (!phone) return res.status(400).json({ error: 'Phone is required' });
+
+       const stmtUpdate = db.prepare('UPDATE users SET phone_number = ? WHERE id = ?');
+       stmtUpdate.run(phone, decoded.userId);
+
+       res.json({ success: true, phone });
+     } catch (err: any) {
+       if (err.message && err.message.includes('UNIQUE constraint failed')) {
+         return res.status(400).json({ error: 'Phone number already linked to an account' });
+       }
+       res.status(500).json({ error: 'Could not link phone' });
+     }
+  });
+
+  app.post('/api/auth/guest-restore', async (req, res) => {
+     try {
+       const { code, phone } = req.body;
+       if (!code && !phone) return res.status(400).json({ error: 'Missing restore method' });
+
+       let user: any;
+       if (code) {
+         const stmt = db.prepare('SELECT * FROM users WHERE backup_code = ?');
+         user = stmt.get(code);
+       } else if (phone) {
+         const stmt = db.prepare('SELECT * FROM users WHERE phone_number = ?');
+         user = stmt.get(phone);
+       }
+       
+       if (!user) return res.status(404).json({ error: 'No account found for provided details' });
+
+       const token = jwt.sign({ userId: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
+       res.json({ token, user: { id: user.id, username: user.username, is_guest: user.is_guest } });
+     } catch (err) {
+       console.error(err);
+       res.status(500).json({ error: 'Could not restore account' });
+     }
+  });
+
+  app.post('/api/auth/guest-convert', async (req, res) => {
+     try {
+       const authHeader = req.headers.authorization;
+       if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ error: 'Missing token' });
+       const token = authHeader.split(' ')[1];
+       const decoded = jwt.verify(token, JWT_SECRET) as any;
+       
+       const { username, password } = req.body;
+       if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
+       
+       const password_hash = await bcrypt.hash(password, 10);
+
+       const stmtUpdate = db.prepare('UPDATE users SET username = ?, password_hash = ?, is_guest = 0 WHERE id = ?');
+       stmtUpdate.run(username, password_hash, decoded.userId);
+       
+       const newToken = jwt.sign({ userId: decoded.userId, username }, JWT_SECRET, { expiresIn: '7d' });
+       res.json({ token: newToken, user: { id: decoded.userId, username, is_guest: 0 } });
+     } catch (err: any) {
+       if (err.message && err.message.includes('UNIQUE constraint failed')) {
+         return res.status(400).json({ error: 'Username already taken' });
+       }
+       console.error(err);
+       res.status(500).json({ error: 'Could not convert account' });
+     }
   });
 
   // Handle Image Uploads with Watermark
@@ -180,13 +297,13 @@ async function startServer() {
         .webp({ quality: 80 })
         .toFile(outputPath);
 
-      const realImageUrl = \`/uploads/crafts/\${filename}\`;
+      const realImageUrl = `/uploads/crafts/${filename}`;
 
-      const stmt = db.prepare(\`
+      const stmt = db.prepare(`
         INSERT INTO craft_images (craft_id, real_image_url) 
         VALUES (?, ?) 
         ON CONFLICT(craft_id) DO UPDATE SET real_image_url = excluded.real_image_url
-      \`);
+      `);
       stmt.run(craftId, realImageUrl);
 
       res.json({ success: true, realImageUrl });

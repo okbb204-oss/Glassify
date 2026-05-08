@@ -86,7 +86,7 @@ export default function TrainingModes() {
   );
 }
 
-function TrainingModeCard({ mode, index }: { mode: typeof trainingModesList[0], index: number }) {
+function TrainingModeCard({ mode, index }: { mode: typeof trainingModesList[0], index: number, key?: React.Key }) {
   const { t, i18n } = useTranslation();
   const isRTL = i18n.language === 'ar';
   const [isExpanded, setIsExpanded] = useState(false);

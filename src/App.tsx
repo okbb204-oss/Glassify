@@ -17,6 +17,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import CourseCompletion from './pages/CourseCompletion';
 import TrainingCenters from './pages/TrainingCenters';
 import TrainingModes from './pages/TrainingModes';
+import Restore from './pages/Restore';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ProgressProvider } from './contexts/ProgressContext';
 import { AuthProvider } from './contexts/AuthContext';
@@ -50,6 +51,7 @@ function AppContent() {
           <Route path="/learn/:craftId/lesson/:lessonId" element={<LessonDetail />} />
           <Route path="/learn/:craftId/finished" element={<CourseCompletion />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/restore" element={<Restore />} />
           <Route path="/about" element={<About />} />
           <Route path="/admin" element={<AdminDashboard />} />
         </Routes>
